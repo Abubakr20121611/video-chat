@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Chat</title>
+<title>Abubakr Video Chat</title>
 
 <style>
 * {
@@ -156,14 +156,24 @@ button {
     transform: translateX(-50%);
     display: flex;
     gap: 10px;
-    background: rgba(20,20,20,.9);
+    background: rgba(20,20,20,.95);
     padding: 12px;
     border-radius: 15px;
+    z-index: 100;
 }
 
 .control {
     background: #333;
     color: white;
+}
+
+.record {
+    background: #b91c1c;
+    color: white;
+}
+
+.recording {
+    background: #dc2626;
 }
 
 .leave {
@@ -177,7 +187,41 @@ button {
     color: #aaa;
 }
 
+/* TELEGRAM */
+.telegram-ad {
+    margin: 30px auto 120px;
+    max-width: 450px;
+    padding: 20px;
+    text-align: center;
+    background: #191e28;
+    border-radius: 16px;
+}
+
+.telegram-logo {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 10px;
+}
+
+.telegram-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.telegram-link {
+    color: #229ED9;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.telegram-link:hover {
+    text-decoration: underline;
+}
+
 @media(max-width:600px) {
+
     .page {
         padding: 15px;
     }
@@ -187,8 +231,14 @@ button {
     }
 
     .controls {
-        width: calc(100% - 30px);
+        width: calc(100% - 20px);
         justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .controls button {
+        font-size: 13px;
+        padding: 11px 12px;
     }
 }
 </style>
@@ -198,9 +248,13 @@ button {
 
 <!-- NAME PAGE -->
 <div id="namePage" class="page active">
+
     <div class="center">
+
         <div class="box">
+
             <h1>🎥 Video Chat</h1>
+
             <p>Enter your name</p>
 
             <input
@@ -210,13 +264,22 @@ button {
                 placeholder="Your name"
             >
 
-            <button class="primary" onclick="continueToRooms()">
+            <button
+                class="primary"
+                onclick="continueToRooms()"
+            >
                 CONTINUE
             </button>
 
-            <p id="nameError" style="color:#ef4444;"></p>
+            <p
+                id="nameError"
+                style="color:#ef4444;"
+            ></p>
+
         </div>
+
     </div>
+
 </div>
 
 
@@ -224,15 +287,24 @@ button {
 <div id="roomsPage" class="page">
 
     <div class="top">
+
         <h1>Choose a SERVER</h1>
+
         <strong id="myName"></strong>
+
     </div>
 
-    <div id="connectionStatus" class="status">
+    <div
+        id="connectionStatus"
+        class="status"
+    >
         Connecting...
     </div>
 
-    <div id="rooms" class="rooms"></div>
+    <div
+        id="rooms"
+        class="rooms"
+    ></div>
 
 </div>
 
@@ -241,23 +313,76 @@ button {
 <div id="videoPage" class="page">
 
     <div class="top">
-        <h2 id="roomTitle">SERVER</h2>
-        <span id="peopleCount">0/5</span>
+
+        <h2 id="roomTitle">
+            SERVER
+        </h2>
+
+        <span id="peopleCount">
+            0/5
+        </span>
+
     </div>
+
 
     <div id="videos"></div>
 
+
+    <!-- TELEGRAM -->
+    <div class="telegram-ad">
+
+        <img
+            src="https://telegram.org/img/t_logo.svg"
+            alt="Telegram"
+            class="telegram-logo"
+        >
+
+        <div class="telegram-title">
+            IELTS Materials by Abubakr
+        </div>
+
+        <a
+            href="https://t.me/Ieltsmaterialsbyabubakr"
+            target="_blank"
+            class="telegram-link"
+        >
+            t.me/Ieltsmaterialsbyabubakr
+        </a>
+
+    </div>
+
+
+    <!-- CONTROLS -->
     <div class="controls">
 
-        <button id="micButton" class="control" onclick="toggleMic()">
+        <button
+            id="micButton"
+            class="control"
+            onclick="toggleMic()"
+        >
             🎤 MIC ON
         </button>
 
-        <button id="cameraButton" class="control" onclick="toggleCamera()">
+        <button
+            id="cameraButton"
+            class="control"
+            onclick="toggleCamera()"
+        >
             📹 CAMERA ON
         </button>
 
-        <button class="leave" onclick="leaveRoom()">
+        <button
+            id="recordButton"
+            class="record"
+            onclick="toggleRecording()"
+        >
+            🔴 RECORD
+        </button>
+
+        <button
+            class="leave"
+            onclick="leaveRoom()"
+        >
             🚪 LEAVE
         </button>
 
@@ -279,23 +404,20 @@ let localStream = null;
 
 const peers = {};
 const peerNames = {};
-
 const pendingCandidates = {};
 
 
+// RECORDING
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+
+
 // ===============================
-// SERVER CONNECTION
+// CONNECT SERVER
 // ===============================
 
 function connectSocket() {
-
-    /*
-       Local test:
-       ws://localhost:10000
-
-       Online HTTPS site:
-       wss://YOUR-SERVER-DOMAIN
-    */
 
     const protocol =
         location.protocol === "https:"
@@ -306,33 +428,41 @@ function connectSocket() {
         protocol + "//" + location.host
     );
 
+
     socket.onopen = () => {
 
         document.getElementById(
             "connectionStatus"
-        ).textContent = "🟢 Connected";
+        ).textContent =
+            "🟢 Connected";
 
     };
+
 
     socket.onclose = () => {
 
         document.getElementById(
             "connectionStatus"
-        ).textContent = "🔴 Disconnected";
+        ).textContent =
+            "🔴 Disconnected";
 
     };
+
 
     socket.onerror = () => {
 
         document.getElementById(
             "connectionStatus"
-        ).textContent = "❌ Connection error";
+        ).textContent =
+            "❌ Connection error";
 
     };
 
+
     socket.onmessage = async event => {
 
-        const data = JSON.parse(event.data);
+        const data =
+            JSON.parse(event.data);
 
         await handleMessage(data);
 
@@ -347,29 +477,38 @@ function connectSocket() {
 function continueToRooms() {
 
     const input =
-        document.getElementById("nameInput");
+        document.getElementById(
+            "nameInput"
+        );
 
     const name =
         input.value.trim();
+
 
     if (!name) {
 
         document.getElementById(
             "nameError"
-        ).textContent = "Please enter your name.";
+        ).textContent =
+            "Please enter your name.";
 
         return;
     }
 
+
     myName = name;
+
 
     document.getElementById(
         "myName"
-    ).textContent = myName;
+    ).textContent =
+        myName;
+
 
     showPage("roomsPage");
 
     connectSocket();
+
 }
 
 
@@ -383,39 +522,54 @@ function showPage(id) {
         .querySelectorAll(".page")
         .forEach(page => {
 
-            page.classList.remove("active");
+            page.classList.remove(
+                "active"
+            );
 
         });
+
 
     document
         .getElementById(id)
         .classList.add("active");
+
 }
 
 
 // ===============================
-// ROOM LIST
+// ROOMS
 // ===============================
 
 function displayRooms(rooms) {
 
     const container =
-        document.getElementById("rooms");
+        document.getElementById(
+            "rooms"
+        );
 
     container.innerHTML = "";
+
 
     rooms.forEach(room => {
 
         const full =
             room.count >= room.max;
 
+
         const div =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
+
 
         div.className = "room";
 
+
         div.innerHTML = `
-            <h2>SERVER ${room.id}</h2>
+
+            <h2>
+                SERVER ${room.id}
+            </h2>
 
             <div class="count">
                 ${room.count}/${room.max}
@@ -428,16 +582,19 @@ function displayRooms(rooms) {
             >
                 ${full ? "FULL" : "JOIN"}
             </button>
+
         `;
+
 
         container.appendChild(div);
 
     });
+
 }
 
 
 // ===============================
-// JOIN ROOM
+// JOIN
 // ===============================
 
 async function joinRoom(roomId) {
@@ -445,28 +602,43 @@ async function joinRoom(roomId) {
     try {
 
         localStream =
-            await navigator.mediaDevices
+            await navigator
+                .mediaDevices
                 .getUserMedia({
+
                     video: true,
                     audio: true
+
                 });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
         alert(
-            "Camera and microphone permission is required."
+            "Please allow camera and microphone."
         );
 
         return;
+
     }
+
 
     currentRoom = roomId;
 
-    socket.send(JSON.stringify({
-        type: "join-room",
-        roomId: roomId,
-        name: myName
-    }));
+
+    socket.send(
+        JSON.stringify({
+
+            type: "join-room",
+
+            roomId: roomId,
+
+            name: myName
+
+        })
+    );
+
 }
 
 
@@ -476,64 +648,84 @@ async function joinRoom(roomId) {
 
 async function handleMessage(data) {
 
+
     if (data.type === "connected") {
 
-        myId = data.userId;
+        myId =
+            data.userId;
 
         return;
+
     }
 
 
     if (data.type === "rooms") {
 
-        displayRooms(data.rooms);
+        displayRooms(
+            data.rooms
+        );
 
         return;
+
     }
 
 
     if (data.type === "room-joined") {
 
-        currentRoom = data.roomId;
+        currentRoom =
+            data.roomId;
+
 
         document.getElementById(
             "roomTitle"
         ).textContent =
-            "SERVER " + currentRoom;
+            "SERVER " +
+            currentRoom;
+
 
         showPage("videoPage");
 
+
         addLocalVideo();
 
-        for (const user of data.users) {
 
-            peerNames[user.userId] =
+        for (
+            const user
+            of data.users
+        ) {
+
+            peerNames[
+                user.userId
+            ] =
                 user.name;
+
 
             await createOffer(
                 user.userId
             );
+
         }
+
 
         updatePeopleCount();
 
         return;
+
     }
 
 
     if (data.type === "user-joined") {
 
-        peerNames[data.userId] =
+        peerNames[
+            data.userId
+        ] =
             data.name;
 
-        /*
-           The NEW user creates the offer.
-           Existing users wait for the offer.
-        */
 
         updatePeopleCount();
 
         return;
+
     }
 
 
@@ -545,25 +737,33 @@ async function handleMessage(data) {
         );
 
         return;
+
     }
 
 
     if (data.type === "user-left") {
 
-        removePeer(data.userId);
+        removePeer(
+            data.userId
+        );
 
         updatePeopleCount();
 
         return;
+
     }
 
 
     if (data.type === "error") {
 
-        alert(data.message);
+        alert(
+            data.message
+        );
 
         return;
+
     }
+
 }
 
 
@@ -574,41 +774,71 @@ async function handleMessage(data) {
 function addLocalVideo() {
 
     const container =
-        document.getElementById("videos");
+        document.getElementById(
+            "videos"
+        );
+
 
     const old =
-        document.getElementById("local-card");
+        document.getElementById(
+            "local-card"
+        );
 
-    if (old) old.remove();
+
+    if (old)
+        old.remove();
+
 
     const card =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
-    card.className = "video-card";
 
-    card.id = "local-card";
+    card.className =
+        "video-card";
+
+
+    card.id =
+        "local-card";
+
 
     const video =
-        document.createElement("video");
+        document.createElement(
+            "video"
+        );
+
 
     video.autoplay = true;
     video.muted = true;
     video.playsInline = true;
 
-    video.srcObject = localStream;
+
+    video.srcObject =
+        localStream;
+
 
     const name =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
-    name.className = "video-name";
+
+    name.className =
+        "video-name";
+
 
     name.textContent =
-        myName + " (You)";
+        myName +
+        " (You)";
+
 
     card.appendChild(video);
+
     card.appendChild(name);
 
     container.appendChild(card);
+
 }
 
 
@@ -623,6 +853,7 @@ function createPeer(userId) {
         return peers[userId];
 
     }
+
 
     const pc =
         new RTCPeerConnection({
@@ -639,9 +870,12 @@ function createPeer(userId) {
         });
 
 
-    peers[userId] = pc;
+    peers[userId] =
+        pc;
 
-    pendingCandidates[userId] = [];
+
+    pendingCandidates[userId] =
+        [];
 
 
     localStream
@@ -656,58 +890,76 @@ function createPeer(userId) {
         });
 
 
-    pc.onicecandidate = event => {
+    pc.onicecandidate =
+        event => {
 
-        if (event.candidate) {
+            if (
+                event.candidate
+            ) {
 
-            sendSignal(
+                sendSignal(
+                    userId,
+                    {
+                        type:
+                            "candidate",
+
+                        candidate:
+                            event.candidate
+                    }
+                );
+
+            }
+
+        };
+
+
+    pc.ontrack =
+        event => {
+
+            addRemoteVideo(
                 userId,
-                {
-                    type: "candidate",
-                    candidate:
-                        event.candidate
-                }
+                event.streams[0]
             );
 
-        }
-
-    };
+        };
 
 
-    pc.ontrack = event => {
+    pc.onconnectionstatechange =
+        () => {
 
-        addRemoteVideo(
-            userId,
-            event.streams[0]
-        );
+            if (
 
-    };
+                pc.connectionState ===
+                "failed"
 
+                ||
 
-    pc.onconnectionstatechange = () => {
+                pc.connectionState ===
+                "closed"
 
-        if (
-            pc.connectionState ===
-            "failed" ||
-            pc.connectionState ===
-            "closed" ||
-            pc.connectionState ===
-            "disconnected"
-        ) {
+                ||
 
-            removePeer(userId);
+                pc.connectionState ===
+                "disconnected"
 
-        }
+            ) {
 
-    };
+                removePeer(
+                    userId
+                );
+
+            }
+
+        };
 
 
     return pc;
+
 }
 
 
 // ===============================
-// CREATE OFFER
+// OFFER
 // ===============================
 
 async function createOffer(userId) {
@@ -715,37 +967,52 @@ async function createOffer(userId) {
     const pc =
         createPeer(userId);
 
+
     const offer =
         await pc.createOffer();
+
 
     await pc.setLocalDescription(
         offer
     );
 
+
     sendSignal(
         userId,
         {
-            type: "offer",
-            offer: pc.localDescription
+
+            type:
+                "offer",
+
+            offer:
+                pc.localDescription
+
         }
     );
+
 }
 
 
 // ===============================
-// SIGNAL
+// SEND SIGNAL
 // ===============================
 
-function sendSignal(target, data) {
+function sendSignal(
+    target,
+    data
+) {
 
     socket.send(
         JSON.stringify({
 
-            type: "signal",
+            type:
+                "signal",
 
-            target: target,
+            target:
+                target,
 
-            data: data
+            data:
+                data
 
         })
     );
@@ -766,7 +1033,10 @@ async function handleSignal(
         createPeer(userId);
 
 
-    if (data.type === "offer") {
+    if (
+        data.type ===
+        "offer"
+    ) {
 
         await pc.setRemoteDescription(
             new RTCSessionDescription(
@@ -792,16 +1062,26 @@ async function handleSignal(
         sendSignal(
             userId,
             {
-                type: "answer",
-                answer: pc.localDescription
+
+                type:
+                    "answer",
+
+                answer:
+                    pc.localDescription
+
             }
         );
 
+
         return;
+
     }
 
 
-    if (data.type === "answer") {
+    if (
+        data.type ===
+        "answer"
+    ) {
 
         await pc.setRemoteDescription(
             new RTCSessionDescription(
@@ -814,11 +1094,16 @@ async function handleSignal(
             userId
         );
 
+
         return;
+
     }
 
 
-    if (data.type === "candidate") {
+    if (
+        data.type ===
+        "candidate"
+    ) {
 
         if (
             pc.remoteDescription
@@ -830,12 +1115,19 @@ async function handleSignal(
                     data.candidate
                 );
 
-            } catch (e) {}
+            }
 
-        } else {
+            catch (error) {}
 
-            pendingCandidates[userId]
-                .push(data.candidate);
+        }
+
+        else {
+
+            pendingCandidates[
+                userId
+            ].push(
+                data.candidate
+            );
 
         }
 
@@ -845,7 +1137,7 @@ async function handleSignal(
 
 
 // ===============================
-// ICE CANDIDATES
+// ICE
 // ===============================
 
 async function processCandidates(
@@ -855,12 +1147,21 @@ async function processCandidates(
     const pc =
         peers[userId];
 
-    if (!pc) return;
+
+    if (!pc)
+        return;
+
 
     const list =
-        pendingCandidates[userId] || [];
+        pendingCandidates[
+            userId
+        ] || [];
 
-    for (const candidate of list) {
+
+    for (
+        const candidate
+        of list
+    ) {
 
         try {
 
@@ -868,11 +1169,16 @@ async function processCandidates(
                 candidate
             );
 
-        } catch (e) {}
+        }
+
+        catch (error) {}
 
     }
 
-    pendingCandidates[userId] = [];
+
+    pendingCandidates[
+        userId
+    ] = [];
 
 }
 
@@ -891,47 +1197,67 @@ function addRemoteVideo(
             "card-" + userId
         );
 
+
     if (card) {
 
         const video =
-            card.querySelector("video");
+            card.querySelector(
+                "video"
+            );
 
-        if (!video.srcObject) {
+
+        if (
+            !video.srcObject
+        ) {
 
             video.srcObject =
                 stream;
 
         }
 
+
         return;
+
     }
 
 
     card =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
+
 
     card.className =
         "video-card";
+
 
     card.id =
         "card-" + userId;
 
 
     const video =
-        document.createElement("video");
+        document.createElement(
+            "video"
+        );
+
 
     video.autoplay = true;
     video.playsInline = true;
+
 
     video.srcObject =
         stream;
 
 
     const name =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
+
 
     name.className =
         "video-name";
+
 
     name.textContent =
         peerNames[userId] ||
@@ -939,11 +1265,14 @@ function addRemoteVideo(
 
 
     card.appendChild(video);
+
     card.appendChild(name);
 
 
     document
-        .getElementById("videos")
+        .getElementById(
+            "videos"
+        )
         .appendChild(card);
 
 
@@ -958,7 +1287,9 @@ function addRemoteVideo(
 
 function removePeer(userId) {
 
-    if (peers[userId]) {
+    if (
+        peers[userId]
+    ) {
 
         peers[userId].close();
 
@@ -980,11 +1311,15 @@ function removePeer(userId) {
             "card-" + userId
         );
 
+
     if (card) {
 
         card.remove();
 
     }
+
+
+    updatePeopleCount();
 
 }
 
@@ -1000,6 +1335,7 @@ function updatePeopleCount() {
             "#videos .video-card"
         ).length;
 
+
     document.getElementById(
         "peopleCount"
     ).textContent =
@@ -1014,15 +1350,22 @@ function updatePeopleCount() {
 
 function toggleMic() {
 
-    if (!localStream) return;
+    if (!localStream)
+        return;
+
 
     const track =
-        localStream.getAudioTracks()[0];
+        localStream
+            .getAudioTracks()[0];
 
-    if (!track) return;
+
+    if (!track)
+        return;
+
 
     track.enabled =
         !track.enabled;
+
 
     document.getElementById(
         "micButton"
@@ -1040,15 +1383,22 @@ function toggleMic() {
 
 function toggleCamera() {
 
-    if (!localStream) return;
+    if (!localStream)
+        return;
+
 
     const track =
-        localStream.getVideoTracks()[0];
+        localStream
+            .getVideoTracks()[0];
 
-    if (!track) return;
+
+    if (!track)
+        return;
+
 
     track.enabled =
         !track.enabled;
+
 
     document.getElementById(
         "cameraButton"
@@ -1061,17 +1411,249 @@ function toggleCamera() {
 
 
 // ===============================
+// RECORDING
+// ===============================
+
+function toggleRecording() {
+
+    if (!localStream) {
+
+        alert(
+            "Camera is not active."
+        );
+
+        return;
+
+    }
+
+
+    if (!isRecording) {
+
+        recordedChunks = [];
+
+
+        let options = {};
+
+
+        if (
+            MediaRecorder.isTypeSupported(
+                "video/webm;codecs=vp9,opus"
+            )
+        ) {
+
+            options = {
+                mimeType:
+                    "video/webm;codecs=vp9,opus"
+            };
+
+        }
+
+        else if (
+            MediaRecorder.isTypeSupported(
+                "video/webm;codecs=vp8,opus"
+            )
+        ) {
+
+            options = {
+                mimeType:
+                    "video/webm;codecs=vp8,opus"
+            };
+
+        }
+
+        else {
+
+            options = {
+                mimeType:
+                    "video/webm"
+            };
+
+        }
+
+
+        try {
+
+            mediaRecorder =
+                new MediaRecorder(
+                    localStream,
+                    options
+                );
+
+        }
+
+        catch (error) {
+
+            mediaRecorder =
+                new MediaRecorder(
+                    localStream
+                );
+
+        }
+
+
+        mediaRecorder.ondataavailable =
+            event => {
+
+                if (
+                    event.data.size > 0
+                ) {
+
+                    recordedChunks.push(
+                        event.data
+                    );
+
+                }
+
+            };
+
+
+        mediaRecorder.onstop =
+            () => {
+
+                const blob =
+                    new Blob(
+                        recordedChunks,
+                        {
+                            type:
+                                "video/webm"
+                        }
+                    );
+
+
+                const url =
+                    URL.createObjectURL(
+                        blob
+                    );
+
+
+                const a =
+                    document.createElement(
+                        "a"
+                    );
+
+
+                a.href =
+                    url;
+
+
+                a.download =
+                    "video-chat-recording.webm";
+
+
+                document
+                    .body
+                    .appendChild(a);
+
+
+                a.click();
+
+
+                a.remove();
+
+
+                setTimeout(() => {
+
+                    URL.revokeObjectURL(
+                        url
+                    );
+
+                }, 1000);
+
+            };
+
+
+        mediaRecorder.start();
+
+
+        isRecording = true;
+
+
+        const button =
+            document.getElementById(
+                "recordButton"
+            );
+
+
+        button.textContent =
+            "⏹ STOP RECORD";
+
+
+        button.classList.add(
+            "recording"
+        );
+
+    }
+
+    else {
+
+        if (
+            mediaRecorder &&
+            mediaRecorder.state !==
+            "inactive"
+        ) {
+
+            mediaRecorder.stop();
+
+        }
+
+
+        isRecording = false;
+
+
+        const button =
+            document.getElementById(
+                "recordButton"
+            );
+
+
+        button.textContent =
+            "🔴 RECORD";
+
+
+        button.classList.remove(
+            "recording"
+        );
+
+    }
+
+}
+
+
+// ===============================
 // LEAVE
 // ===============================
 
 function leaveRoom() {
 
-    if (socket &&
-        socket.readyState === WebSocket.OPEN) {
+    if (
+        isRecording &&
+        mediaRecorder
+    ) {
+
+        if (
+            mediaRecorder.state !==
+            "inactive"
+        ) {
+
+            mediaRecorder.stop();
+
+        }
+
+        isRecording = false;
+
+    }
+
+
+    if (
+        socket &&
+        socket.readyState ===
+        WebSocket.OPEN
+    ) {
 
         socket.send(
             JSON.stringify({
-                type: "leave-room"
+                type:
+                    "leave-room"
             })
         );
 
@@ -1099,8 +1681,11 @@ function leaveRoom() {
         localStream
             .getTracks()
             .forEach(track => {
+
                 track.stop();
+
             });
+
 
         localStream = null;
 
@@ -1111,15 +1696,19 @@ function leaveRoom() {
         "videos"
     ).innerHTML = "";
 
+
     currentRoom = null;
 
-    showPage("roomsPage");
+
+    showPage(
+        "roomsPage"
+    );
 
 }
 
 
 // ===============================
-// PAGE CLOSE
+// CLOSE PAGE
 // ===============================
 
 window.addEventListener(
@@ -1134,7 +1723,8 @@ window.addEventListener(
 
             socket.send(
                 JSON.stringify({
-                    type: "leave-room"
+                    type:
+                        "leave-room"
                 })
             );
 
